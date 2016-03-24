@@ -19,6 +19,11 @@ import fetch from "isomorphic-fetch"
 //         app()
 //     })
 // }
+                // guests: {no: this.props.guestColl.where({status: "no"}),
+                //         yes: this.props.guestColl.where({status: "yes"}),
+                //         pending: this.props.guestColl.where({status: "pending"})
+                //     }
+
 
 import DOM from 'react-dom'
 import React, {Component} from 'react'
@@ -30,7 +35,8 @@ function app() {
     var GuestModel = Backbone.Model.extend({
 
         defaults: {
-            partySize: 1
+            partySize: 1,
+            status: "pending"
         },
 
         initialize: function(newName) {
@@ -46,6 +52,29 @@ function app() {
 
         _addGuest: function(name) {
             this.state.guestColl.add(new GuestModel(name))
+            this._updater()
+        },
+
+        _genbuttons: function() {
+            var butts = ["pending","no","yes","all"].map(function(guestType){
+                return <button onClick={this._filterView} value={guestType}>{guestType}</button>
+            }.bind(this))
+            return butts
+        },
+
+        _filterView: function(event) {
+            var buttView = event.target.value
+            this.setState({
+                viewType: buttView
+            })
+        },
+
+        _removeGuest: function(model) {
+            this.state.guestColl.remove(model)
+            this._updater()
+        },
+
+        _updater: function() {
             this.setState({
                 guestColl: this.state.guestColl
             })
@@ -53,15 +82,22 @@ function app() {
 
         getInitialState: function() {
             return {
-                guestColl: this.props.guestColl
+                guestColl: this.props.guestColl,
+                viewType: "all"
             }
         },
 
         render: function() {
+            var guestColl = this.state.guestColl
+            if (this.state.viewType === "pending") guestColl = guestColl.where({status:"pending"})
+            if (this.state.viewType === "yes") guestColl = guestColl.where({status:"yes"})
+            if (this.state.viewType === "no") guestColl = guestColl.where({status:"no"})
+
             return (
                 <div className="partyView">
+                    <div className="buttons">{this._genbuttons()}</div>
                     <GuestAdder adderFunc={this._addGuest}/>
-                    <GuestList guestColl={this.state.guestColl}/>
+                    <GuestList updater={this._updater} guestColl={guestColl} remover={this._removeGuest}/>
                 </div>  
                 )
         }
@@ -73,6 +109,7 @@ function app() {
             if (keyEvent.keyCode === 13) {
                 var guestName = keyEvent.target.value
                 this.props.adderFunc(guestName)
+                keyEvent.target.value = ''
             }
         },
 
@@ -84,10 +121,12 @@ function app() {
     var GuestList = React.createClass({
 
         _makeGuest: function(model) {
-            return <Guest guestModel={model} />
+            return <Guest updater={this.props.updater} guestModel={model} remover={this.props.remover}/>
         },
 
+
         render: function() {
+            console.log(this)
             return (
                 <div className="guestList">
                     {this.props.guestColl.map(this._makeGuest)}
@@ -97,8 +136,29 @@ function app() {
     })
 
     var Guest = React.createClass({
+
+        _selectStatus: function(event) {
+            var newStat = event.target.value
+            this.props.guestModel.set({status:newStat})
+            this.props.updater()
+        },
+
+        _clickHandler: function() {
+            this.props.remover(this.props.guestModel)
+        },
+
         render: function() {
-            return <p>{this.props.guestModel.get('name')}</p>
+            return <div className="guest">
+                        <p>{this.props.guestModel.get('name')}</p>
+                        <p>{this.props.guestModel.get('status')}</p>
+                        <select onChange={this._selectStatus} >
+                            <option value="">change rsvp</option>
+                            <option value="pending">pending</option>
+                            <option value="no">no</option>
+                            <option value="yes">yes</option>
+                        </select>
+                        <button onClick={this._clickHandler}>x</button>
+                    </div>
         }
     })
 
